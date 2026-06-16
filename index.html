@@ -248,6 +248,38 @@ tr:hover td{background:var(--bg-surface)}
 .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:var(--r-100);font-size:13px;font-weight:700;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;box-shadow:var(--sh-3)}
 .toast.show{opacity:1}
 
+/* ── CHAT PANEL ────────────────────────────────────────────── */
+.chat-overlay{display:none;position:fixed;inset:0;background:rgba(12,12,12,.3);z-index:150}
+.chat-overlay.open{display:block}
+.chat-panel{position:fixed;top:0;right:0;width:420px;height:100vh;background:#fff;box-shadow:-4px 0 32px rgba(12,12,12,.14);z-index:151;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 320ms cubic-bezier(0.4,0,0,1)}
+.chat-panel.open{transform:translateX(0)}
+@media(max-width:600px){.chat-panel{width:100vw}}
+.cp-header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:56px;background:#1a1a1a;color:#fff;flex-shrink:0}
+.cp-title{font-size:14px;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;letter-spacing:-0.01em}
+.cp-title i{color:var(--mp-red);font-size:12px}
+.cp-close{background:rgba(255,255,255,.1);border:none;color:#fff;width:28px;height:28px;border-radius:var(--r-50);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:background var(--dur-fast)}
+.cp-close:hover{background:rgba(255,255,255,.25)}
+.cp-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.cp-msg{display:flex;flex-direction:column;max-width:88%}
+.cp-msg-ai{align-self:flex-start}
+.cp-msg-user{align-self:flex-end}
+.cp-msg-system{align-self:stretch;max-width:100%}
+.cp-msg-bubble{padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.55}
+.cp-msg-ai .cp-msg-bubble{background:var(--bg-sunken);border:1px solid var(--border-subtle);color:var(--fg-primary);border-bottom-left-radius:var(--r-25)}
+.cp-msg-user .cp-msg-bubble{background:#1a1a1a;color:#fff;border-bottom-right-radius:var(--r-25)}
+.cp-msg-system .cp-msg-bubble{background:var(--color-red-10);border:1px solid var(--color-red-30);color:var(--fg-primary);font-size:12px;border-radius:var(--r-100)}
+.cp-added-items{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.cp-added-item{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:var(--r-pill);background:var(--color-gray-20);color:var(--fg-muted);text-transform:uppercase;letter-spacing:0.04em;align-self:flex-start}
+.cp-added-item i{color:var(--accent);font-size:10px}
+.cp-composer{border-top:1px solid var(--border-default);padding:12px 16px 16px;flex-shrink:0;background:var(--bg-surface)}
+.cp-input{width:100%;min-height:80px;max-height:180px;padding:10px 12px;border:1.5px solid var(--border-default);border-radius:var(--r-100);font-size:13px;font-family:var(--font-sans);resize:none;outline:none;line-height:1.55;background:#fff;transition:border-color var(--dur-fast)}
+.cp-input:focus{border-color:var(--accent)}
+.cp-composer-footer{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.cp-hint{font-size:11px;color:var(--fg-muted)}
+.cp-send{width:32px;height:32px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-100);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;transition:background var(--dur-fast);flex-shrink:0}
+.cp-send:hover{background:var(--accent-hover)}
+.cp-send:disabled{opacity:.45;cursor:not-allowed}
+
 /* ── BUTTONS ───────────────────────────────────────────────── */
 .btn{padding:9px 16px;border-radius:var(--r-100);font-weight:700;font-size:13px;cursor:pointer;border:none;font-family:var(--font-sans);transition:background var(--dur-base) var(--ease-out)}
 .btn-primary{background:#1a1a1a;color:#fff}.btn-primary:hover{background:var(--accent)}
@@ -276,7 +308,7 @@ tr:hover td{background:var(--bg-surface)}
     <div class="topbar-sep"></div>
     <span class="topbar-title">Highlight Studio</span>
     <div class="topbar-actions">
-      <button class="topbar-btn" onclick="openNotes()"><i class="fa-solid fa-note-sticky"></i> Meeting Notes</button>
+      <button class="topbar-btn" onclick="openChat()"><i class="fa-solid fa-sparkles"></i> AI Chat</button>
       <button class="topbar-btn" onclick="openSettings()"><i class="fa-solid fa-gear"></i> Settings</button>
     </div>
   </div>
@@ -473,23 +505,23 @@ tr:hover td{background:var(--bg-surface)}
   </div>
 </div>
 
-<!-- Meeting notes modal -->
-<div class="modal-overlay" id="notesModal">
-  <div class="modal" style="width:640px">
-    <div class="modal-header">
-      <span class="modal-title">📝 Paste Meeting Notes</span>
-      <button class="modal-close" onclick="closeModal('notesModal')">×</button>
+<!-- AI Chat sidebar -->
+<div class="chat-overlay" id="chatOverlay" onclick="closeChat()"></div>
+<div class="chat-panel" id="chatPanel">
+  <div class="cp-header">
+    <div class="cp-title"><i class="fa-solid fa-sparkles"></i> Project AI</div>
+    <button class="cp-close" onclick="closeChat()"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div class="cp-messages" id="cpMessages">
+    <div class="cp-msg cp-msg-ai">
+      <div class="cp-msg-bubble">Paste meeting notes, describe a decision, raise a question, flag a risk, or update any item — I'll detect what it is and update the tracker automatically.</div>
     </div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">Paste notes from any meeting. AI will extract decisions made and open questions raised, and add them to the tracker.</p>
-      <textarea class="notes-area" id="notesText" placeholder="Paste meeting notes here…&#10;&#10;Example: 'Team agreed that athlete-led claim is preferred path. Legal flagged that parent verification thresholds need to be defined before we can design the parent flow. Brian to follow up with legal by EOW.'"></textarea>
-      <div class="notes-hint">Tip: Include the date and meeting name at the top for better context.</div>
-      <div id="notesExtracted" style="margin-top:16px"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary btn-sm" onclick="closeModal('notesModal')">Cancel</button>
-      <button class="btn btn-primary btn-sm" id="notesExtractBtn" onclick="extractNotes()">✨ Extract with AI</button>
-      <button class="btn btn-green btn-sm" id="notesAddBtn" style="display:none" onclick="addExtracted()">Add to Tracker</button>
+  </div>
+  <div class="cp-composer">
+    <textarea class="cp-input" id="cpInput" placeholder="Paste meeting notes, describe a decision, flag a risk…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+    <div class="cp-composer-footer">
+      <span class="cp-hint">Enter to send · Shift+Enter for new line</span>
+      <button class="cp-send" id="cpSend" onclick="sendChat()"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
   </div>
 </div>
@@ -874,7 +906,6 @@ let clState = JSON.parse(localStorage.getItem('cl')||'{}');
 
 // ── CURRENT EDIT STATE ─────────────────────────────────────
 let editTarget = null; // {collection, index, item}
-let extractedItems = null;
 
 // ── INIT ───────────────────────────────────────────────────
 function initApp(){
@@ -1256,79 +1287,184 @@ function applyEdit(updates,msgs){
 }
 
 // ── MEETING NOTES ─────────────────────────────────────────
-function openNotes(){document.getElementById('notesExtracted').innerHTML='';document.getElementById('notesAddBtn').style.display='none';extractedItems=null;openModal('notesModal');}
+// ── AI CHAT SIDEBAR ───────────────────────────────────────────
+let chatHistory = [];
 
-async function extractNotes(){
-  const notes=document.getElementById('notesText').value.trim();
-  if(!notes){toast('Please paste some meeting notes first.');return;}
-  const btn=document.getElementById('notesExtractBtn');
-  btn.textContent='Extracting…';btn.disabled=true;
-
-  try{
-    const sys=`Extract decisions and open questions from meeting notes. Return JSON: {"decisions":[{"decision":"...","description":"...","owner":"...","status":"Decided"}],"questions":[{"question":"...","category":"...","priority":"P0","owner":"...","status":"Open","impact":"...","decisionMaker":"..."}]}. Only include things explicitly decided or raised as open questions. Return ONLY valid JSON.`;
-    const res=await callClaude(sys,notes);
-    extractedItems=JSON.parse(res.replace(/```json?|```/g,'').trim());
-  }catch(e){
-    extractedItems=parseNotesBasic(notes);
-  }
-
-  renderExtracted();
-  btn.textContent='✨ Extract with AI';btn.disabled=false;
+function openChat(){
+  document.getElementById('chatPanel').classList.add('open');
+  document.getElementById('chatOverlay').classList.add('open');
+  document.getElementById('cpInput').focus();
+}
+function closeChat(){
+  document.getElementById('chatPanel').classList.remove('open');
+  document.getElementById('chatOverlay').classList.remove('open');
 }
 
-function parseNotesBasic(text){
-  const decisions=[],questions=[];
-  const lines=text.split('\n');
-  for(const line of lines){
-    const l=line.trim().toLowerCase();
-    if(l.match(/\b(agreed|decided|decision|will be|going with|confirmed|approved)\b/)&&line.trim().length>20)
-      decisions.push({decision:line.trim(),description:'',owner:'TBD',status:'Decided'});
-    else if(l.match(/\b(question|open|unclear|tbd|need to|who|what|when|how|should we|do we)\b/)&&line.trim().length>20)
-      questions.push({question:line.trim(),category:'General',priority:'P1',owner:'TBD',status:'Open',impact:'TBD',decisionMaker:'TBD'});
+function addChatMessage(role, text, id, addedItems){
+  const container = document.getElementById('cpMessages');
+  const wrap = document.createElement('div');
+  wrap.className = `cp-msg cp-msg-${role}`;
+  if(id) wrap.id = id;
+  const bubble = document.createElement('div');
+  bubble.className = 'cp-msg-bubble';
+  if(role === 'thinking'){
+    bubble.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:var(--fg-muted);margin-right:6px"></i>Analyzing…';
+  } else {
+    bubble.textContent = text;
   }
-  return{decisions,questions};
+  wrap.appendChild(bubble);
+  if(addedItems?.length){
+    const list = document.createElement('div');
+    list.className = 'cp-added-items';
+    addedItems.forEach(item => {
+      const chip = document.createElement('div');
+      chip.className = 'cp-added-item';
+      chip.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${item.type}: ${item.id}`;
+      list.appendChild(chip);
+    });
+    wrap.appendChild(list);
+  }
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+  return wrap;
 }
 
-function renderExtracted(){
-  const el=document.getElementById('notesExtracted');
-  if(!extractedItems||((!extractedItems.decisions||!extractedItems.decisions.length)&&(!extractedItems.questions||!extractedItems.questions.length))){
-    el.innerHTML='<div style="color:var(--gray);font-size:13px">No decisions or open questions found in these notes. Try adding more context.</div>';
-    return;
-  }
-  let html='';
-  if(extractedItems.decisions&&extractedItems.decisions.length){
-    html+=`<div style="font-weight:700;font-size:13px;margin-bottom:8px">✅ Decisions (${extractedItems.decisions.length})</div>`;
-    html+=extractedItems.decisions.map(d=>`<div class="extracted-item"><div class="label">Decision · ${d.status}</div><div class="text">${d.decision}</div></div>`).join('');
-  }
-  if(extractedItems.questions&&extractedItems.questions.length){
-    html+=`<div style="font-weight:700;font-size:13px;margin:12px 0 8px">❓ Open Questions (${extractedItems.questions.length})</div>`;
-    html+=extractedItems.questions.map(q=>`<div class="extracted-item" style="background:var(--orange-pale)"><div class="label" style="color:var(--orange)">Question · ${q.priority}</div><div class="text">${q.question}</div></div>`).join('');
-  }
-  document.getElementById('notesExtracted').innerHTML=html;
-  document.getElementById('notesAddBtn').style.display='';
+function buildChatSystemPrompt(){
+  const ids = {
+    decisions: DECISIONS.map(d=>d.id).join(', '),
+    questions: QUESTIONS_DATA.map(q=>q.id).join(', '),
+    requirements: REQUIREMENTS.map(r=>r.id).join(', '),
+    risks: RISKS.map(r=>r.id).join(', '),
+    design: DESIGN_ITEMS.map(d=>d.id).join(', ')
+  };
+  const summary = [
+    `Requirements: ${REQUIREMENTS.length} (${REQUIREMENTS.filter(r=>r.status==='Blocked').length} blocked)`,
+    `Open Questions: ${QUESTIONS_DATA.filter(q=>q.status==='Open').length} open of ${QUESTIONS_DATA.length}`,
+    `Decisions: ${DECISIONS.length}  Risks: ${RISKS.length} (${RISKS.filter(r=>r.severity==='Critical').length} critical)  Design Items: ${DESIGN_ITEMS.length}`,
+    `Decision IDs: ${ids.decisions}`,
+    `Question IDs: ${ids.questions}`,
+    `Requirement IDs: ${ids.requirements}`,
+    `Risk IDs: ${ids.risks}`,
+    `Design IDs: ${ids.design}`,
+  ].join('\n');
+  return `You are a project intelligence assistant for the MaxPreps Highlight Studio project tracker. Analyze what the user sends and update the tracker accordingly.
+
+CURRENT STATE:\n${summary}
+
+Input types you handle:
+- Meeting notes → extract decisions + open questions
+- "We decided X" / decision description → add to decisions
+- Open question or blocker → add to questions
+- New requirement → add to requirements
+- New risk or concern → add to risks
+- New design item needed → add to design items
+- Status update referencing an existing ID → use "updates" to change fields
+- Mixed input → extract everything relevant
+
+Return ONLY valid JSON (no markdown, no code fences):
+{"reply":"1-3 sentence response describing what you found and added.","decisions":[{"decision":"","desc":"","status":"Decided","owner":"","impact":""}],"questions":[{"question":"","category":"","priority":"P1","owner":"","decisionMaker":"","status":"Open","impact":""}],"requirements":[{"title":"","desc":"","category":"","priority":"P1","status":"Not Started","owner":"","decisionState":"Open","notes":""}],"risks":[{"title":"","desc":"","severity":"Medium","probability":"Medium","owner":"","mitigation":"","status":"Open"}],"designItems":[{"name":"","desc":"","journey":"","priority":"P1","status":"Needed","legalReview":"Not Started","notes":""}],"updates":[{"collection":"DECISIONS","id":"DEC-001","changes":{"status":"Resolved"}}]}
+
+Only include arrays that have content. Omit empty arrays.`;
 }
 
-function addExtracted(){
-  if(!extractedItems)return;
-  let added=0;
-  if(extractedItems.decisions){
-    extractedItems.decisions.forEach(d=>{
+async function processChatResponse(data){
+  const added = [];
+  const saves = {};
+  if(data.decisions?.length){
+    data.decisions.forEach(d=>{
       const id=`DEC-${String(DECISIONS.length+1).padStart(3,'0')}`;
-      DECISIONS.push({id,...d,impact:d.impact||'TBD'});
-      added++;
+      DECISIONS.push({id, decision:d.decision||'', desc:d.desc||'', status:d.status||'Decided', owner:d.owner||'', impact:d.impact||''});
+      added.push({type:'Decision',id});
     });
+    saves.decisions = DECISIONS; renderDecs();
   }
-  if(extractedItems.questions){
-    extractedItems.questions.forEach(q=>{
+  if(data.questions?.length){
+    data.questions.forEach(q=>{
       const id=`Q-${String(QUESTIONS_DATA.length+1).padStart(3,'0')}`;
-      QUESTIONS_DATA.push({id,...q});
-      added++;
+      QUESTIONS_DATA.push({id, question:q.question||'', category:q.category||'General', priority:q.priority||'P1', owner:q.owner||'', decisionMaker:q.decisionMaker||'', status:q.status||'Open', impact:q.impact||''});
+      added.push({type:'Question',id});
     });
+    saves.questions = QUESTIONS_DATA; renderQs();
   }
-  saveToFirestore({decisions:DECISIONS,questions:QUESTIONS_DATA});
-  closeModal('notesModal');
-  renderOverview();renderDecs();renderQs();
-  toast(`Added ${added} item${added!==1?'s':''} to the tracker`);
+  if(data.requirements?.length){
+    data.requirements.forEach(r=>{
+      const id=`REQ-${String(REQUIREMENTS.length+1).padStart(3,'0')}`;
+      REQUIREMENTS.push({id, title:r.title||'', desc:r.desc||'', category:r.category||'', priority:r.priority||'P1', status:r.status||'Not Started', owner:r.owner||'', decisionState:r.decisionState||'Open', notes:r.notes||''});
+      added.push({type:'Requirement',id});
+    });
+    saves.requirements = REQUIREMENTS; renderReqs();
+  }
+  if(data.risks?.length){
+    data.risks.forEach(r=>{
+      const id=`RSK-${String(RISKS.length+1).padStart(3,'0')}`;
+      RISKS.push({id, title:r.title||'', desc:r.desc||'', severity:r.severity||'Medium', probability:r.probability||'Medium', owner:r.owner||'', mitigation:r.mitigation||'', status:r.status||'Open'});
+      added.push({type:'Risk',id});
+    });
+    saves.risks = RISKS; renderRisks();
+  }
+  if(data.designItems?.length){
+    data.designItems.forEach(d=>{
+      const id=`DES-${String(DESIGN_ITEMS.length+1).padStart(3,'0')}`;
+      DESIGN_ITEMS.push({id, name:d.name||'', desc:d.desc||'', journey:d.journey||'', priority:d.priority||'P1', status:d.status||'Needed', designer:'TBD', legalReview:d.legalReview||'Not Started', figmaLink:'', notes:d.notes||''});
+      added.push({type:'Design',id});
+    });
+    saves.designItems = DESIGN_ITEMS; renderDesign();
+  }
+  if(data.updates?.length){
+    data.updates.forEach(u=>{
+      const arr = COLLECTIONS[u.collection];
+      if(!arr) return;
+      const item = arr.find(i=>i.id===u.id);
+      if(item){ Object.assign(item, u.changes); added.push({type:'Updated',id:u.id}); }
+      const fsKey = FS_KEY[u.collection];
+      if(fsKey) saves[fsKey] = arr;
+    });
+    renderReqs(); renderQs(); renderDesign(); renderDecs(); renderRisks();
+  }
+  if(Object.keys(saves).length){ saveToFirestore(saves); renderOverview(); }
+  return added;
+}
+
+async function sendChat(){
+  const input = document.getElementById('cpInput');
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = '';
+  document.getElementById('cpSend').disabled = true;
+  addChatMessage('user', msg);
+  chatHistory.push({role:'user', content:msg});
+  const thinking = addChatMessage('thinking', '', 'cpThinking');
+  try{
+    const sys = buildChatSystemPrompt();
+    const messages = chatHistory.map(m=>({role:m.role, content:m.content}));
+    const res = await callClaudeChat(sys, messages);
+    thinking.remove();
+    let data;
+    try{ data = JSON.parse(res.replace(/```json?|```/g,'').trim()); }
+    catch{ data = {reply: res}; }
+    const added = await processChatResponse(data);
+    addChatMessage('ai', data.reply || res, null, added);
+    chatHistory.push({role:'assistant', content:data.reply || res});
+  }catch(e){
+    thinking.remove();
+    addChatMessage('ai', `Something went wrong: ${e.message}`);
+  }
+  document.getElementById('cpSend').disabled = false;
+}
+
+async function callClaudeChat(system, messages){
+  const res = await fetch('https://api.portkey.ai/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-portkey-api-key':PORTKEY_KEY},
+    body:JSON.stringify({
+      model:PORTKEY_MODEL,
+      max_tokens:1024,
+      messages:[{role:'system',content:system},...messages]
+    })
+  });
+  if(!res.ok){ const err=await res.text().catch(()=>''); throw new Error(`API error ${res.status}: ${err}`); }
+  const data = await res.json();
+  return data.choices[0].message.content;
 }
 
 // ── PORTKEY API ───────────────────────────────────────────
