@@ -1468,9 +1468,8 @@ async function callClaudeChat(system, messages){
 }
 
 // ── PORTKEY API ───────────────────────────────────────────
-// Virtual key — proxied through Portkey.ai. Real Anthropic key never leaves Portkey.
 const PORTKEY_KEY = 'rr3IGeqSSY+9iSTTChBGNVU11LaO';
-const PORTKEY_MODEL = '@anthropic-dev/claude-3-5-haiku-20241022';
+const PORTKEY_MODEL = '@openai-dev/gpt-3.5-turbo-1106';
 
 async function callClaude(system, userMsg){
   const res = await fetch('https://api.portkey.ai/v1/chat/completions', {
