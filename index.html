@@ -313,7 +313,7 @@ tr:hover td{background:#f8fafc}
     <!-- REQUIREMENTS -->
     <div class="page" id="requirements">
       <div class="section">
-        <div class="section-header"><span class="section-title">Requirements</span><span class="section-count" id="reqCount"></span></div>
+        <div class="section-header"><span class="section-title">Requirements</span><span class="section-count" id="reqCount"></span><button class="edit-btn" style="margin-left:auto" onclick="addItem('REQUIREMENTS')">+ Add</button></div>
         <div class="filters">
           <input class="filter-input" id="reqSearch" placeholder="Search…" oninput="renderReqs()">
           <select class="filter-select" id="reqCat" onchange="renderReqs()"><option value="">All Categories</option></select>
@@ -328,7 +328,7 @@ tr:hover td{background:#f8fafc}
     <!-- QUESTIONS -->
     <div class="page" id="questions">
       <div class="section">
-        <div class="section-header"><span class="section-title">Open Questions</span><span class="section-count" id="qCount"></span></div>
+        <div class="section-header"><span class="section-title">Open Questions</span><span class="section-count" id="qCount"></span><button class="edit-btn" style="margin-left:auto" onclick="addItem('QUESTIONS_DATA')">+ Add</button></div>
         <div class="filters">
           <input class="filter-input" id="qSearch" placeholder="Search…" oninput="renderQs()">
           <select class="filter-select" id="qCat" onchange="renderQs()"><option value="">All Categories</option></select>
@@ -343,7 +343,7 @@ tr:hover td{background:#f8fafc}
     <!-- DESIGN -->
     <div class="page" id="design">
       <div class="section">
-        <div class="section-header"><span class="section-title">Design Work</span><span class="section-count" id="designCount"></span></div>
+        <div class="section-header"><span class="section-title">Design Work</span><span class="section-count" id="designCount"></span><button class="edit-btn" style="margin-left:auto" onclick="addItem('DESIGN_ITEMS')">+ Add</button></div>
         <div class="filters">
           <input class="filter-input" id="designSearch" placeholder="Search…" oninput="renderDesign()">
           <select class="filter-select" id="designStatus" onchange="renderDesign()"><option value="">All Statuses</option><option>Needed</option><option>In Progress</option><option>Ready for Review</option><option>Legal Review</option><option>Approved</option></select>
@@ -356,7 +356,7 @@ tr:hover td{background:#f8fafc}
     <!-- DECISIONS -->
     <div class="page" id="decisions">
       <div class="section">
-        <div class="section-header"><span class="section-title">Decision Log</span><span class="section-count" id="decCount"></span></div>
+        <div class="section-header"><span class="section-title">Decision Log</span><span class="section-count" id="decCount"></span><button class="edit-btn" style="margin-left:auto" onclick="addItem('DECISIONS')">+ Add</button></div>
         <div class="filters">
           <input class="filter-input" id="decSearch" placeholder="Search…" oninput="renderDecs()">
           <select class="filter-select" id="decStatus" onchange="renderDecs()"><option value="">All</option><option>Decided</option><option>Proposed</option><option>Pending Confirmation</option><option>Reversed</option></select>
@@ -368,7 +368,7 @@ tr:hover td{background:#f8fafc}
     <!-- RISKS -->
     <div class="page" id="risks">
       <div class="section">
-        <div class="section-header"><span class="section-title">Risk Register</span><span class="section-count" id="riskCount"></span></div>
+        <div class="section-header"><span class="section-title">Risk Register</span><span class="section-count" id="riskCount"></span><button class="edit-btn" style="margin-left:auto" onclick="addItem('RISKS')">+ Add</button></div>
         <div class="filters">
           <input class="filter-input" id="riskSearch" placeholder="Search…" oninput="renderRisks()">
           <select class="filter-select" id="riskSev" onchange="renderRisks()"><option value="">All Severities</option><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select>
@@ -412,6 +412,7 @@ tr:hover td{background:#f8fafc}
       <div style="font-size:11px;color:var(--gray);margin-top:8px">Press Enter to send · Shift+Enter for new line · Changes apply immediately</div>
     </div>
     <div class="modal-footer">
+      <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5" onclick="deleteItem()">Delete</button>
       <button class="btn btn-secondary btn-sm" onclick="closeModal('editModal')">Close</button>
     </div>
   </div>
@@ -1092,6 +1093,39 @@ function saveFigma(){
   closeModal('figmaModal');
   renderOverview();
   toast('Figma links saved');
+}
+
+// ── ADD / DELETE ──────────────────────────────────────────
+const BLANK_ITEM = {
+  REQUIREMENTS: ()=>({id:`REQ-${String(REQUIREMENTS.length+1).padStart(3,'0')}`,title:'New Requirement',desc:'',category:'',priority:'P1',status:'Not Started',owner:'',decisionState:'Open',notes:''}),
+  QUESTIONS_DATA: ()=>({id:`Q-${String(QUESTIONS_DATA.length+1).padStart(3,'0')}`,question:'New Question',category:'',priority:'P1',owner:'',decisionMaker:'',status:'Open',impact:''}),
+  DESIGN_ITEMS: ()=>({id:`DES-${String(DESIGN_ITEMS.length+1).padStart(3,'0')}`,name:'New Design Item',desc:'',journey:'',priority:'P1',status:'Needed',designer:'TBD',legalReview:'Not Started',figmaLink:'',notes:''}),
+  DECISIONS: ()=>({id:`DEC-${String(DECISIONS.length+1).padStart(3,'0')}`,decision:'New Decision',desc:'',status:'Proposed',owner:'',impact:''}),
+  RISKS: ()=>({id:`RSK-${String(RISKS.length+1).padStart(3,'0')}`,title:'New Risk',desc:'',severity:'Medium',probability:'Medium',owner:'',mitigation:'',status:'Open'}),
+};
+
+function addItem(collection){
+  const arr = COLLECTIONS[collection];
+  const item = BLANK_ITEM[collection]();
+  arr.push(item);
+  const fsKey = FS_KEY[collection];
+  if(fsKey) saveToFirestore({[fsKey]:[...arr]});
+  if(RE_RENDERS[collection]) RE_RENDERS[collection]();
+  renderOverview();
+  openEdit(collection, arr.length - 1);
+}
+
+function deleteItem(){
+  if(!editTarget) return;
+  if(!confirm(`Delete "${editTarget.item.title||editTarget.item.question||editTarget.item.decision||editTarget.item.name||editTarget.item.id}"? This cannot be undone.`)) return;
+  const arr = COLLECTIONS[editTarget.collection];
+  arr.splice(editTarget.idx, 1);
+  const fsKey = FS_KEY[editTarget.collection];
+  if(fsKey) saveToFirestore({[fsKey]:[...arr]});
+  if(RE_RENDERS[editTarget.collection]) RE_RENDERS[editTarget.collection]();
+  renderOverview();
+  closeModal('editModal');
+  toast('Item deleted');
 }
 
 // ── EDIT MODAL ────────────────────────────────────────────
