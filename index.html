@@ -1330,41 +1330,25 @@ function addChatMessage(role, text, id, addedItems){
 }
 
 function buildChatSystemPrompt(){
-  const ids = {
-    decisions: DECISIONS.map(d=>d.id).join(', '),
-    questions: QUESTIONS_DATA.map(q=>q.id).join(', '),
-    requirements: REQUIREMENTS.map(r=>r.id).join(', '),
-    risks: RISKS.map(r=>r.id).join(', '),
-    design: DESIGN_ITEMS.map(d=>d.id).join(', ')
-  };
-  const summary = [
-    `Requirements: ${REQUIREMENTS.length} (${REQUIREMENTS.filter(r=>r.status==='Blocked').length} blocked)`,
-    `Open Questions: ${QUESTIONS_DATA.filter(q=>q.status==='Open').length} open of ${QUESTIONS_DATA.length}`,
-    `Decisions: ${DECISIONS.length}  Risks: ${RISKS.length} (${RISKS.filter(r=>r.severity==='Critical').length} critical)  Design Items: ${DESIGN_ITEMS.length}`,
-    `Decision IDs: ${ids.decisions}`,
-    `Question IDs: ${ids.questions}`,
-    `Requirement IDs: ${ids.requirements}`,
-    `Risk IDs: ${ids.risks}`,
-    `Design IDs: ${ids.design}`,
-  ].join('\n');
-  return `You are a project intelligence assistant for the MaxPreps Highlight Studio project tracker. Analyze what the user sends and update the tracker accordingly.
+  const fmt = arr => JSON.stringify(arr);
+  return `You are a project intelligence assistant for the MaxPreps Highlight Studio project tracker. You can both ANSWER questions about the tracker data AND UPDATE the tracker with new information.
 
-CURRENT STATE:\n${summary}
+CURRENT TRACKER DATA:
+Requirements (${REQUIREMENTS.length}): ${fmt(REQUIREMENTS.map(r=>({id:r.id,title:r.title,status:r.status,priority:r.priority,owner:r.owner,desc:r.desc})))}
+Questions (${QUESTIONS_DATA.length}): ${fmt(QUESTIONS_DATA.map(q=>({id:q.id,question:q.question,status:q.status,priority:q.priority,owner:q.owner,category:q.category,impact:q.impact})))}
+Decisions (${DECISIONS.length}): ${fmt(DECISIONS.map(d=>({id:d.id,decision:d.decision,status:d.status,owner:d.owner,impact:d.impact,desc:d.desc})))}
+Risks (${RISKS.length}): ${fmt(RISKS.map(r=>({id:r.id,title:r.title,severity:r.severity,probability:r.probability,status:r.status,owner:r.owner,mitigation:r.mitigation})))}
+Design Items (${DESIGN_ITEMS.length}): ${fmt(DESIGN_ITEMS.map(d=>({id:d.id,name:d.name,status:d.status,priority:d.priority,designer:d.designer})))}
 
-Input types you handle:
-- Meeting notes → extract decisions + open questions
-- "We decided X" / decision description → add to decisions
-- Open question or blocker → add to questions
-- New requirement → add to requirements
-- New risk or concern → add to risks
-- New design item needed → add to design items
-- Status update referencing an existing ID → use "updates" to change fields
-- Mixed input → extract everything relevant
+MODES:
+1. Q&A — user asks a question about the project: answer using the data above. Be concise and specific (reference IDs, owners, statuses).
+2. Data entry — user provides meeting notes, decisions, questions, risks, requirements, or design items: extract and add them to the tracker.
+3. Mixed — answer AND update.
 
 Return ONLY valid JSON (no markdown, no code fences):
-{"reply":"1-3 sentence response describing what you found and added.","decisions":[{"decision":"","desc":"","status":"Decided","owner":"","impact":""}],"questions":[{"question":"","category":"","priority":"P1","owner":"","decisionMaker":"","status":"Open","impact":""}],"requirements":[{"title":"","desc":"","category":"","priority":"P1","status":"Not Started","owner":"","decisionState":"Open","notes":""}],"risks":[{"title":"","desc":"","severity":"Medium","probability":"Medium","owner":"","mitigation":"","status":"Open"}],"designItems":[{"name":"","desc":"","journey":"","priority":"P1","status":"Needed","legalReview":"Not Started","notes":""}],"updates":[{"collection":"DECISIONS","id":"DEC-001","changes":{"status":"Resolved"}}]}
+{"reply":"conversational response — answer the question or confirm what was added/updated","decisions":[{"decision":"","desc":"","status":"Decided","owner":"","impact":""}],"questions":[{"question":"","category":"","priority":"P1","owner":"","decisionMaker":"","status":"Open","impact":""}],"requirements":[{"title":"","desc":"","category":"","priority":"P1","status":"Not Started","owner":"","decisionState":"Open","notes":""}],"risks":[{"title":"","desc":"","severity":"Medium","probability":"Medium","owner":"","mitigation":"","status":"Open"}],"designItems":[{"name":"","desc":"","journey":"","priority":"P1","status":"Needed","legalReview":"Not Started","notes":""}],"updates":[{"collection":"DECISIONS","id":"DEC-001","changes":{"status":"Resolved"}}]}
 
-Only include arrays that have content. Omit empty arrays.`;
+For Q&A with no tracker changes, return only {"reply":"..."}. Only include data arrays when adding new items. Only include "updates" when changing existing items.`;
 }
 
 async function processChatResponse(data){
