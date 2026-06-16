@@ -1443,8 +1443,14 @@ async function sendChat(){
     try{ data = JSON.parse(res.replace(/```json?|```/g,'').trim()); }
     catch{ data = {reply: res}; }
     const added = await processChatResponse(data);
-    addChatMessage('ai', data.reply || res, null, added);
-    chatHistory.push({role:'assistant', content:data.reply || res});
+    let replyText = data.reply;
+    if(!replyText && added.length){
+      const summary = added.map(i=>`${i.type} ${i.id}`).join(', ');
+      replyText = `Added ${added.length} item${added.length>1?'s':''} to the tracker: ${summary}.`;
+    }
+    if(!replyText) replyText = 'Done — no tracker changes needed.';
+    addChatMessage('ai', replyText, null, added);
+    chatHistory.push({role:'assistant', content:replyText});
   }catch(e){
     thinking.remove();
     addChatMessage('ai', `Something went wrong: ${e.message}`);
