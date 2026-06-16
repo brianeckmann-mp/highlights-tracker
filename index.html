@@ -457,6 +457,12 @@ tr:hover td{background:#f8fafc}
         <label class="setting-label">Current Phase</label>
         <input class="setting-input" type="text" id="phaseInput" style="font-family:inherit" placeholder="e.g. Phase 1 · Verification Foundation">
       </div>
+      <div class="setting-row" style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+        <label class="setting-label">Firebase Config (for shared database)</label>
+        <div class="setting-hint">Paste your Firebase project config JSON to sync changes across the team in real time. <a href="https://console.firebase.google.com" target="_blank" style="color:var(--blue-l)">Get config →</a></div>
+        <textarea class="setting-input" id="firebaseConfigInput" rows="6" style="font-size:11px;resize:vertical" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+        <div id="firebaseStatus" style="font-size:12px;margin-top:6px;color:var(--gray)"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary btn-sm" onclick="closeModal('settingsModal')">Cancel</button>
@@ -504,6 +510,80 @@ tr:hover td{background:#f8fafc}
 <div class="toast" id="toast"></div>
 
 <script>
+// ── FIREBASE ─────────────────────────────────────────────
+let _fbDoc = null, _fbSetDoc = null, _fbUnsubscribe = null, _fbReceiving = false;
+
+async function initFirebase() {
+  let cfg;
+  try { cfg = JSON.parse(localStorage.getItem('firebaseCfg') || 'null'); } catch(e) {}
+  if (!cfg || !cfg.apiKey) return;
+
+  try {
+    const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+    const { getFirestore, doc, setDoc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+
+    const app = getApps().length ? getApps()[0] : initializeApp(cfg);
+    const db = getFirestore(app);
+    _fbDoc = doc(db, 'tracker', 'main');
+    _fbSetDoc = setDoc;
+
+    if (_fbUnsubscribe) _fbUnsubscribe();
+    _fbUnsubscribe = onSnapshot(_fbDoc, snap => {
+      if (!snap.exists()) {
+        // First connection — push local state up
+        _saveAllToFirestore();
+        return;
+      }
+      _fbReceiving = true;
+      applyFirestoreData(snap.data());
+      _fbReceiving = false;
+    }, err => {
+      setFirebaseStatus('Error: ' + err.message, 'var(--red)');
+    });
+
+    setFirebaseStatus('Connected — changes sync in real time', 'var(--green)');
+  } catch(e) {
+    setFirebaseStatus('Firebase error: ' + e.message, 'var(--red)');
+  }
+}
+
+function setFirebaseStatus(msg, color) {
+  const el = document.getElementById('firebaseStatus');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--gray)'; }
+}
+
+function applyFirestoreData(data) {
+  if (data.team)         { TEAM.length = 0; TEAM.push(...data.team); }
+  if (data.figma)        { FIGMA.length = 0; FIGMA.push(...data.figma); }
+  if (data.settings)     Object.assign(SETTINGS, data.settings);
+  if (data.clState)      clState = data.clState;
+  if (data.decisions)    { DECISIONS.length = 0; DECISIONS.push(...data.decisions); }
+  if (data.questions)    { QUESTIONS_DATA.length = 0; QUESTIONS_DATA.push(...data.questions); }
+  if (data.requirements) { REQUIREMENTS.length = 0; REQUIREMENTS.push(...data.requirements); }
+  if (data.designItems)  { DESIGN_ITEMS.length = 0; DESIGN_ITEMS.push(...data.designItems); }
+  if (data.risks)        { RISKS.length = 0; RISKS.push(...data.risks); }
+  // Re-render everything
+  renderOverview(); renderReqs(); renderQs(); renderDesign();
+  renderDecs(); renderRisks(); renderChecklist();
+  loadSettings();
+}
+
+async function saveToFirestore(partial) {
+  if (!_fbDoc || !_fbSetDoc || _fbReceiving) return;
+  try { await _fbSetDoc(_fbDoc, partial, { merge: true }); } catch(e) { console.error('Firestore save:', e); }
+}
+
+async function _saveAllToFirestore() {
+  await saveToFirestore({
+    team: TEAM, figma: FIGMA, settings: SETTINGS, clState,
+    decisions: DECISIONS, questions: QUESTIONS_DATA,
+    requirements: REQUIREMENTS, designItems: DESIGN_ITEMS, risks: RISKS
+  });
+}
+
+// Firestore key per collection
+const FS_KEY = { REQUIREMENTS:'requirements', QUESTIONS_DATA:'questions', DESIGN_ITEMS:'designItems', DECISIONS:'decisions', RISKS:'risks' };
+
 // ── PASSWORD ──────────────────────────────────────────────
 const PW = 'highlights2027';
 function tryLogin(){
@@ -753,6 +833,7 @@ function initApp(){
   renderChecklist();
   populateFilters();
   loadSettings();
+  initFirebase();
 }
 
 function setupNav(){
@@ -947,7 +1028,7 @@ function renderChecklist(){
   }).join('');
   document.getElementById('clProgress').textContent=`${done} / ${total} complete`;
 }
-function toggleCl(k){clState[k]=!clState[k];localStorage.setItem('cl',JSON.stringify(clState));renderChecklist();}
+function toggleCl(k){clState[k]=!clState[k];localStorage.setItem('cl',JSON.stringify(clState));saveToFirestore({clState});renderChecklist();}
 
 // ── HELPERS ───────────────────────────────────────────────
 function v(id){return(document.getElementById(id)||{}).value||'';}
@@ -959,13 +1040,28 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function openSettings(){
   document.getElementById('launchInput').value=SETTINGS.launch||'';
   document.getElementById('phaseInput').value=SETTINGS.phase||'';
+  const cfg=localStorage.getItem('firebaseCfg')||'';
+  document.getElementById('firebaseConfigInput').value=cfg;
+  setFirebaseStatus(_fbDoc ? 'Connected — changes sync in real time' : cfg ? 'Not connected — check config' : '', _fbDoc ? 'var(--green)' : 'var(--red)');
   openModal('settingsModal');
 }
-function saveSettings(){
+async function saveSettings(){
   SETTINGS.launch=document.getElementById('launchInput').value;
   SETTINGS.phase=document.getElementById('phaseInput').value;
   localStorage.setItem('settings',JSON.stringify(SETTINGS));
   document.querySelector('.meta-value.highlight').textContent='🏀 '+SETTINGS.launch;
+
+  const cfgRaw=document.getElementById('firebaseConfigInput').value.trim();
+  if(cfgRaw){
+    try{
+      JSON.parse(cfgRaw); // validate
+      localStorage.setItem('firebaseCfg',cfgRaw);
+      setFirebaseStatus('Connecting…','var(--gray)');
+      await initFirebase();
+    }catch(e){ setFirebaseStatus('Invalid JSON — check config','var(--red)'); return; }
+  }
+
+  saveToFirestore({settings:SETTINGS});
   closeModal('settingsModal');
   toast('Settings saved');
 }
@@ -978,6 +1074,7 @@ function openTeamEdit(){
 function saveTeam(){
   TEAM=document.getElementById('teamText').value.split('\n').filter(l=>l.trim()).map(l=>{const p=l.split(',');return{name:(p[0]||'').trim(),role:(p.slice(1).join(',').trim())};});
   localStorage.setItem('team',JSON.stringify(TEAM));
+  saveToFirestore({team:TEAM});
   closeModal('teamModal');
   renderOverview();
   toast('Team updated');
@@ -991,6 +1088,7 @@ function openFigmaEdit(){
 function saveFigma(){
   FIGMA=document.getElementById('figmaText').value.split('\n').filter(l=>l.trim()).map(l=>{const p=l.split('|');return{name:(p[0]||'').trim(),url:(p[1]||'').trim()};});
   localStorage.setItem('figma',JSON.stringify(FIGMA));
+  saveToFirestore({figma:FIGMA});
   closeModal('figmaModal');
   renderOverview();
   toast('Figma links saved');
@@ -1062,6 +1160,9 @@ function applyEdit(updates,msgs){
   msgs.innerHTML+=`<div class="chat-msg system">✓ Updated: ${changed}</div>`;
   if(RE_RENDERS[editTarget.collection])RE_RENDERS[editTarget.collection]();
   renderOverview();
+  const fsKey=FS_KEY[editTarget.collection];
+  const arr=window[editTarget.collection]||COLLECTIONS[editTarget.collection];
+  if(fsKey&&arr)saveToFirestore({[fsKey]:[...arr]});
 }
 
 // ── MEETING NOTES ─────────────────────────────────────────
@@ -1134,6 +1235,7 @@ function addExtracted(){
       added++;
     });
   }
+  saveToFirestore({decisions:DECISIONS,questions:QUESTIONS_DATA});
   closeModal('notesModal');
   renderOverview();renderDecs();renderQs();
   toast(`Added ${added} item${added!==1?'s':''} to the tracker`);
